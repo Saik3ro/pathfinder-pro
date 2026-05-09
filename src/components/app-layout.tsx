@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "./theme-provider";
-import { mockUser } from "@/lib/mock-data";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "@tanstack/react-router";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -26,6 +27,19 @@ export function AppLayout() {
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { resolved, setTheme } = useTheme();
+  const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const fullName = profile?.full_name?.trim() || "";
+  const email = user?.email || "";
+  const displayName = fullName || email || "Account";
+  const showEmailSubtitle = Boolean(fullName) ? email : "";
+  const initials = (fullName || email || "U")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join("");
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -92,14 +106,36 @@ export function AppLayout() {
             {resolved === "dark" ? "Light mode" : "Dark mode"}
           </button>
           <div className="flex items-center gap-3 rounded-lg p-2">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-              {mockUser.initials}
-            </div>
+            {profile?.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={displayName}
+                className="h-9 w-9 rounded-full object-cover"
+              />
+            ) : (
+              <div className="grid h-9 w-9 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                {initials}
+              </div>
+            )}
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{mockUser.name}</p>
-              <p className="truncate text-xs text-muted-foreground">{mockUser.email}</p>
+              <p className="truncate text-sm font-medium">{displayName}</p>
+              {showEmailSubtitle ? (
+                <p className="truncate text-xs text-muted-foreground">{showEmailSubtitle}</p>
+              ) : null}
             </div>
           </div>
+
+          <button
+            onClick={async () => {
+              const { error } = await signOut();
+              if (!error) {
+                navigate({ to: "/auth", replace: true });
+              }
+            }}
+            className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+          >
+            Sign out
+          </button>
         </div>
       </aside>
 

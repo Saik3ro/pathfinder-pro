@@ -1,7 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { GraduationCap, Github, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — PathLearn" }] }),
@@ -10,6 +11,40 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const [tab, setTab] = useState<"in" | "up">("in");
+  const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
+
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+
+    try {
+      if (tab === "up") {
+        const res = await signUp(email.trim(), password, fullName.trim());
+        if (res.error) throw res.error;
+        await navigate({ to: "/" });
+      } else {
+        const { error: signInError } = await signIn(email.trim(), password);
+        if (signInError) throw new Error(signInError);
+        await navigate({ to: "/" });
+      }
+    } catch (err) {
+      const message =
+        err && typeof err === "object" && "message" in err && typeof (err as any).message === "string"
+          ? (err as any).message
+          : "Something went wrong.";
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-12">
@@ -49,17 +84,55 @@ function AuthPage() {
             {tab === "in" ? "Sign in to continue your learning." : "Start building your first learning path."}
           </p>
 
-          <form className="mt-6 space-y-3" onSubmit={(e) => e.preventDefault()}>
+          <form className="mt-6 space-y-3" onSubmit={onSubmit}>
             {tab === "up" && (
-              <input placeholder="Full name" className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+              <input
+                id="fullName"
+                name="fullName"
+                autoComplete="name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Full name"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              />
             )}
-            <input type="email" placeholder="Email" className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
-            <input type="password" placeholder="Password" className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
-            <Link to="/" className="block">
-              <button type="button" className="mt-2 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90">
-                {tab === "in" ? "Sign in" : "Create account"}
-              </button>
-            </Link>
+            <input
+              id="email"
+              name="email"
+              autoComplete="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <input
+              id="password"
+              name="password"
+              autoComplete={tab === "up" ? "new-password" : "current-password"}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+            />
+
+            {error && (
+              <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            >
+              {submitting && (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+              )}
+              {tab === "in" ? "Sign in" : "Create account"}
+            </button>
           </form>
 
           <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">

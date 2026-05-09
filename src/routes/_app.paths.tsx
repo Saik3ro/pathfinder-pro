@@ -1,13 +1,49 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { mockPaths } from "@/lib/mock-data";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase, type Database } from "@/lib/supabaseClient";
 
 export const Route = createFileRoute("/_app/paths")({
   head: () => ({ meta: [{ title: "My Paths — PathLearn" }] }),
   component: PathsPage,
 });
 
+type LearningDeck = Database["public"]["Tables"]["learning_decks"]["Row"];
+
 function PathsPage() {
+  const { user } = useAuth();
+  const [decks, setDecks] = useState<LearningDeck[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!user) return;
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("learning_decks")
+        .select("id, title, description, progress_percentage, updated_at")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false });
+
+      if (cancelled) return;
+      if (error) {
+        setDecks([]);
+        setLoading(false);
+        return;
+      }
+      setDecks(data ?? []);
+      setLoading(false);
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -20,25 +56,67 @@ function PathsPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {mockPaths.map((p) => {
-          const done = p.milestones.filter((m) => m.completed).length;
-          const pct = Math.round((done / p.milestones.length) * 100);
-          return (
-            <Link key={p.id} to="/path/$id" params={{ id: p.id }} className="group rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:border-primary/40" style={{ boxShadow: "var(--shadow-card)" }}>
-              <div className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${p.accent}`}>
-                <p.icon className="h-5 w-5 text-white" />
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-2xl border border-border bg-card p-5"
+              style={{ boxShadow: "var(--shadow-card)" }}
+            >
+              <div className="h-4 w-1/2 overflow-hidden rounded bg-muted">
+                <div className="h-full w-full shimmer" />
               </div>
-              <h3 className="mt-4 text-base font-semibold">{p.title}</h3>
-              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.description}</p>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--gradient-primary)" }} />
+              <div className="mt-3 h-3 w-4/5 overflow-hidden rounded bg-muted">
+                <div className="h-full w-full shimmer" />
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">{done}/{p.milestones.length} milestones · {pct}%</p>
-            </Link>
-          );
-        })}
-      </div>
+              <div className="mt-5 h-2 overflow-hidden rounded-full bg-muted">
+                <div className="h-full w-1/3 shimmer" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : decks.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-6 py-16 text-center">
+          <h3 className="text-lg font-semibold">No paths yet</h3>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+            Create a learning path to see it here.
+          </p>
+          <Link
+            to="/create"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" /> Create your first path
+          </Link>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {decks.map((d) => {
+            const pct = Math.max(0, Math.min(100, Math.round(d.progress_percentage ?? 0)));
+            return (
+              <Link
+                key={d.id}
+                to="/path/$id"
+                params={{ id: String(d.id) }}
+                className="group rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:border-primary/40"
+                style={{ boxShadow: "var(--shadow-card)" }}
+              >
+                <h3 className="text-base font-semibold">{d.title}</h3>
+                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                  {d.description || "No description yet."}
+                </p>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${pct}%`, background: "var(--gradient-primary)" }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">{pct}% complete</p>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

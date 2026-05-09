@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Sparkles, ArrowRight, Compass, Plus } from "lucide-react";
-import { mockUser, mockPaths } from "@/lib/mock-data";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase, type Database } from "@/lib/supabaseClient";
 
 export const Route = createFileRoute("/_app/")({
   head: () => ({
@@ -9,8 +11,46 @@ export const Route = createFileRoute("/_app/")({
   component: Dashboard,
 });
 
+type LearningDeck = Database["public"]["Tables"]["learning_decks"]["Row"];
+
 function Dashboard() {
-  const paths = mockPaths;
+  const { user, profile } = useAuth();
+  const [decks, setDecks] = useState<LearningDeck[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const firstName = useMemo(() => {
+    const n = profile?.full_name?.trim();
+    if (n) return n.split(/\s+/)[0];
+    return (user?.email || "there").split("@")[0];
+  }, [profile?.full_name, user?.email]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!user) return;
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("learning_decks")
+        .select("id, title, description, progress_percentage, updated_at")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false });
+
+      if (cancelled) return;
+      if (error) {
+        setDecks([]);
+        setLoading(false);
+        return;
+      }
+      setDecks(data ?? []);
+      setLoading(false);
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   return (
     <div className="space-y-10">
@@ -20,7 +60,7 @@ function Dashboard() {
             <Sparkles className="h-3.5 w-3.5" /> AI-powered learning
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-primary-foreground md:text-4xl">
-            Welcome back, {mockUser.name.split(" ")[0]}.
+            Welcome back, {firstName}.
           </h1>
           <p className="mt-2 text-primary-foreground/80 md:text-lg">Ready to learn today?</p>
           <Link
@@ -45,30 +85,46 @@ function Dashboard() {
           </Link>
         </div>
 
-        {paths.length === 0 ? <EmptyPaths /> : (
+        {loading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {paths.map((p) => {
-              const done = p.milestones.filter((m) => m.completed).length;
-              const pct = Math.round((done / p.milestones.length) * 100);
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-2xl border border-border bg-card p-5"
+                style={{ boxShadow: "var(--shadow-card)" }}
+              >
+                <div className="h-4 w-1/2 overflow-hidden rounded bg-muted">
+                  <div className="h-full w-full shimmer" />
+                </div>
+                <div className="mt-3 h-3 w-4/5 overflow-hidden rounded bg-muted">
+                  <div className="h-full w-full shimmer" />
+                </div>
+                <div className="mt-5 h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full w-1/3 shimmer" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : decks.length === 0 ? (
+          <EmptyPaths />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {decks.map((d) => {
+              const pct = Math.max(0, Math.min(100, Math.round(d.progress_percentage ?? 0)));
               return (
                 <Link
-                  key={p.id}
+                  key={d.id}
                   to="/path/$id"
-                  params={{ id: p.id }}
+                  params={{ id: String(d.id) }}
                   className="group rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:border-primary/40"
                   style={{ boxShadow: "var(--shadow-card)" }}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className={`grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${p.accent}`}>
-                      <p.icon className="h-5 w-5 text-white" />
-                    </div>
-                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">{p.topic}</span>
-                  </div>
-                  <h3 className="mt-4 text-base font-semibold">{p.title}</h3>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.description}</p>
+                  <h3 className="text-base font-semibold">{d.title}</h3>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    {d.description || "No description yet."}
+                  </p>
                   <div className="mt-5">
                     <div className="mb-1.5 flex justify-between text-xs text-muted-foreground">
-                      <span>{done}/{p.milestones.length} milestones</span>
                       <span>{pct}%</span>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
