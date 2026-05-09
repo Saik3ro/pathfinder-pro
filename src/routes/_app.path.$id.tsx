@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, Check, ChevronDown, Layers, Sparkles } from "lucide-react";
-import { mockPaths } from "@/lib/mock-data";
+import { mockPaths, type LearningPath } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/path/$id")({
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_app/path/$id")({
 });
 
 function PathDetail() {
-  const path = Route.useLoaderData();
+  const path = Route.useLoaderData() as LearningPath;
   const [expanded, setExpanded] = useState<string | null>(path.milestones.find((m) => !m.completed)?.id ?? null);
   const [completed, setCompleted] = useState<Record<string, boolean>>(
     Object.fromEntries(path.milestones.map((m) => [m.id, m.completed])),
