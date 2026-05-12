@@ -3,8 +3,8 @@ const { execSync } = require('child_process');
 console.log('🚀 Starting Vercel deployment...');
 
 try {
-  // Try to deploy using Vercel CLI with different approach
-  const deploy = execSync('npx vercel --prod --no-deploy', { 
+  // Deploy using Vercel CLI with correct options
+  const deploy = execSync('npx vercel --prod', { 
     encoding: 'utf8',
     stdio: 'inherit'
   });
