@@ -12,7 +12,7 @@ export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
-  vite: {
+vite: {
     server: {
       port: 5173,
       strictPort: true,
